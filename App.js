@@ -1,20 +1,32 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from "@react-navigation/native";
+import AppNavigator from "./navigation/AppNavigator.js";
+import { useEffect } from "react";
+import { Audio } from "expo-av";
 
 export default function App() {
+  const soundAsset = require("./assets/sounds/bg.m4a");
+  const playClickSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(soundAsset);
+      await sound.setIsLoopingAsync(true);
+      await sound.setVolumeAsync(0.2);
+      await sound.playAsync();
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) sound.unloadAsync();
+      });
+    } catch (error) {
+      console.log("Error playing sound:", error);
+    }
+  };
+  useEffect(() => {
+    setInterval(() => {
+      playClickSound();
+    }, 124000);
+      playClickSound();
+  }, []);
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <NavigationContainer>
+      <AppNavigator />
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

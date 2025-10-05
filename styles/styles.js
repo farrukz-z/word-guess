@@ -1,0 +1,61 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, alignItems: "center" },
+  title: { fontSize: 24, fontWeight: "bold", margin: 20, color: 'white' },
+  categoryButton: {
+    flex: 1,
+    margin: 10,
+    height: 100,
+    backgroundColor: "#2196f3",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+  },
+  categoryText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
+  missionButton: {
+    backgroundColor: "#0c3683c2",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    borderWidth: 2,
+    borderColor: 'white'
+  },
+  missionText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
+  grid: { flexDirection: "row", marginBottom: 20, flexWrap: 'wrap' },
+  cell: {
+    borderWidth: 3/2,
+    borderColor: "#333",
+    width: 35,
+    height: 35,
+    justifyContent: "center",
+    alignItems: "center",
+    margin: 2,
+    borderRadius: 5,
+    backgroundColor: "#fff",
+  },
+  cellText: { fontSize: 18, fontWeight: "bold" },
+  keyboard: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  key: {
+    width: 40,
+    height: 40,
+    margin: 3,
+    backgroundColor: "#ddd",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 5,
+  },
+  keyText: { fontWeight: "bold" },
+  submit: {
+    backgroundColor: "#2196f3",
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 5,
+  },
+  missionImage: { width: "80%", height: 200, marginBottom: 20, borderWidth: 4, borderColor: "white", elevation: 4 },
+});
