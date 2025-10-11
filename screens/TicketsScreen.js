@@ -1,25 +1,33 @@
-import React, { useEffect, useState } from "react";
+// screens/TicketsScreen.js
+
+import React, { useEffect, useState, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { View, Text, TouchableOpacity, ImageBackground } from "react-native";
-import { styles } from "../styles/styles.js";
+import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from "react-native";
+import { styles } from "../styles/styles.js"; // Убедитесь, что стили импортированы корректно
 
 export default function TicketsScreen({ route, navigation }) {
   const { category } = route.params;
   const [completed, setCompleted] = useState([]);
 
-  useEffect(() => {
-    const loadCompleted = async () => {
+  const loadCompleted = useCallback(async () => {
+    try {
       const stored = await AsyncStorage.getItem("completedWords");
-      setCompleted(stored ? JSON.parse(stored) : []);
-    };
+      const data = stored ? JSON.parse(stored) : [];
+      setCompleted(data);
+    } catch (error) {
+        console.error("Error loading completed words:", error);
+    }
+  }, []); 
+
+  useEffect(() => {
+    loadCompleted();
     const unsubscribe = navigation.addListener("focus", loadCompleted);
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, loadCompleted]);
+  
 
   const isLocked = (index) => {
-    // 1-chi topshiriq har doim ochiq
     if (index === 0) return false;
-    // Avvalgisini topmagan bo'lsa — qulflanadi
     return !completed.includes(category.items[index - 1].id);
   };
 
@@ -52,7 +60,12 @@ export default function TicketsScreen({ route, navigation }) {
                 ]}
                 disabled={locked}
                 onPress={() =>
-                  !locked && navigation.navigate("Question", { mission: item })
+                  // 💡 ИЗМЕНЕНИЕ: Передаем весь массив и текущий индекс
+                  !locked && navigation.navigate("Question", { 
+                    mission: item,
+                    categoryItems: category.items, // Полный список миссий
+                    missionIndex: i, // Индекс текущей миссии
+                  })
                 }
               >
                 <Text style={styles.missionText}>
