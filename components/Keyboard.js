@@ -1,6 +1,7 @@
 // components/Keyboard.js
 import React, { useRef, useEffect } from "react";
-import { View, TouchableOpacity, Text, StyleSheet, Dimensions, Animated, PanResponder } from "react-native";
+import { View, TouchableOpacity, Text, StyleSheet, Dimensions, Animated } from "react-native";
+import { Audio } from "expo-av";
 
 const { width, height } = Dimensions.get("window");
 
@@ -19,6 +20,55 @@ export default function Keyboard({
   onDragStart = () => {},
   onDragEnd = () => {},
 }) {
+  // sound ref
+  const pressSoundRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const soundAsset = require("../assets/sounds/notice.wav");
+        const { sound } = await Audio.Sound.createAsync(soundAsset);
+        if (!mounted) {
+          // если уже размонтированы — выгружаем
+          if (sound) await sound.unloadAsync();
+          return;
+        }
+        pressSoundRef.current = sound;
+      } catch (e) {
+        console.log("Keyboard sound load error:", e);
+      }
+    };
+    load();
+
+    return () => {
+      mounted = false;
+      (async () => {
+        try {
+          if (pressSoundRef.current) {
+            await pressSoundRef.current.unloadAsync();
+            pressSoundRef.current = null;
+          }
+        } catch (e) {
+          console.log("Error unloading keyboard sound:", e);
+        }
+      })();
+    };
+  }, []);
+
+  const playPress = async () => {
+    try {
+      if (!pressSoundRef.current) return;
+      const status = await pressSoundRef.current.getStatusAsync();
+      if (status.isLoaded) {
+        if (status.isPlaying) await pressSoundRef.current.stopAsync();
+        await pressSoundRef.current.replayAsync();
+      }
+    } catch (e) {
+      console.log("playPress err", e);
+    }
+  };
+
   // Расположение букв по кругу
   const getLettersAroundCircle = () => {
     const count = keys.length;
@@ -74,8 +124,10 @@ export default function Keyboard({
                   onDragStart(item.letter, item.idx);
                 }
               }}
-              onPress={() => {
+              onPress={async () => {
                 if (!isUsed && !draggingLetter) {
+                  // воспроизводим звук и вызываем callback
+                  playPress().catch(() => {});
                   onPressKey(item.idx);
                 }
               }}
