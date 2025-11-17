@@ -1,5 +1,4 @@
-// screens/TicketsScreen.js
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,35 +6,45 @@ import {
   ImageBackground,
   SafeAreaView,
   FlatList,
-  Dimensions,
   StatusBar,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { styles as globalStyles } from "../styles/styles.js"; // если хочешь использовать свои глобальные стили
 
-const { width } = Dimensions.get("window");
-const NUM_COLUMNS = 3;
+// Константы для адаптивной сетки
 const ITEM_MARGIN = 8;
-
-// Паддинги контейнера — уменьшенный левый паддинг для "сдвига влево"
-const PADDING_LEFT = 10;
-const PADDING_RIGHT = 30;
-const CONTAINER_HORIZONTAL_PADDING = PADDING_LEFT + PADDING_RIGHT;
-
-// Вычисляем ширину элемента сетки
-const totalGaps = ITEM_MARGIN * 2 * NUM_COLUMNS;
-const availableWidth = width - CONTAINER_HORIZONTAL_PADDING - totalGaps;
-const ITEM_WIDTH = Math.floor(availableWidth / NUM_COLUMNS);
+const PADDING_HORIZONTAL = 20;
+const MIN_ITEM_WIDTH = 100;
 
 export default function TicketsScreen({ route, navigation }) {
   const { category } = route.params || {};
   const [completed, setCompleted] = useState([]);
+  const { width } = useWindowDimensions();
+
+  // Адаптивное количество колонок в зависимости от ширины экрана
+  const numColumns = useMemo(() => {
+    const availableWidth = width - PADDING_HORIZONTAL * 2;
+    const columns = Math.floor(availableWidth / (MIN_ITEM_WIDTH + ITEM_MARGIN * 2));
+    return Math.max(2, Math.min(columns, 5)); // От 2 до 5 колонок
+  }, [width]);
+
+  // Вычисляем ширину элемента
+  const itemWidth = useMemo(() => {
+    const totalMargin = ITEM_MARGIN * 2 * numColumns;
+    const availableWidth = width - PADDING_HORIZONTAL * 2 - totalMargin;
+    return Math.floor(availableWidth / numColumns);
+  }, [width, numColumns]);
 
   const loadCompleted = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem("completedWords");
-      const data = stored ? JSON.parse(stored) : [];
+      if (!stored) {
+        setCompleted([]);
+        return;
+      }
+
+      const data = JSON.parse(stored);
       const normalized = Array.isArray(data) ? data.map((x) => String(x)) : [];
       setCompleted(normalized);
     } catch (error) {
@@ -50,81 +59,123 @@ export default function TicketsScreen({ route, navigation }) {
     return unsubscribe;
   }, [navigation, loadCompleted]);
 
-  const isLocked = (index) => {
-    if (index === 0) return false;
-    const prev = category?.items?.[index - 1];
-    if (!prev || prev.id === undefined || prev.id === null) return true;
-    return !completed.includes(String(prev.id));
-  };
+  const isLocked = useCallback(
+    (index) => {
+      if (index === 0) return false;
+      const prev = category?.items?.[index - 1];
+      if (!prev || prev.id === undefined || prev.id === null) return true;
+      return !completed.includes(String(prev.id));
+    },
+    [category, completed]
+  );
 
-  const isSolved = (item) => {
-    if (!item || item.id === undefined || item.id === null) return false;
-    return completed.includes(String(item.id));
-  };
+  const isSolved = useCallback(
+    (item) => {
+      if (!item || item.id === undefined || item.id === null) return false;
+      return completed.includes(String(item.id));
+    },
+    [completed]
+  );
 
-  // Защита: если category или category.items не определены — показываем заглушку
+  const renderItem = useCallback(
+    ({ item, index }) => {
+      const locked = isLocked(index);
+      const solved = isSolved(item);
+
+      return (
+        <View style={{ width: itemWidth, margin: ITEM_MARGIN }}>
+          <TouchableOpacity
+            style={[
+              styles.card,
+              {
+                backgroundColor: solved
+                  ? "#22c55e"
+                  : locked
+                  ? "#64748b"
+                  : "#2563eb",
+                opacity: locked ? 0.6 : 1,
+              },
+            ]}
+            disabled={locked}
+            activeOpacity={0.7}
+            onPress={() =>
+              !locked &&
+              navigation.navigate("Question", {
+                mission: item,
+                categoryItems: category.items,
+                missionIndex: index,
+              })
+            }
+          >
+            <Text style={styles.cardNumber}>{index + 1}</Text>
+            <Text style={styles.cardIcon}>{solved ? "⭐" : locked ? "🔒" : "🎯"}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    },
+    [itemWidth, isLocked, isSolved, navigation, category]
+  );
+
+  const keyExtractor = useCallback(
+    (item, idx) => String(item?.id ?? `item-${idx}`),
+    []
+  );
+
   if (!category || !Array.isArray(category.items)) {
     return (
-      <ImageBackground source={require("../assets/bg.png")} style={{ flex: 1 }}>
-        <SafeAreaView style={[styles.centerFallback]}>
-          <Text style={[globalStyles?.title || styles.title]}>Нет доступных миссий</Text>
-          <Text style={{ color: "#fff", marginTop: 8 }}>Проверьте данные категории.</Text>
+      <ImageBackground
+        source={require("../assets/bg.png")}
+        style={{ flex: 1 }}
+      >
+        <SafeAreaView style={styles.centerFallback}>
+          <Text style={styles.title}>Нет доступных миссий</Text>
+          <Text style={styles.fallbackText}>Проверьте данные категории.</Text>
+
+          <TouchableOpacity
+            style={[styles.backButton, { marginTop: 18 }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>← Назад</Text>
+          </TouchableOpacity>
         </SafeAreaView>
       </ImageBackground>
     );
   }
 
-  const renderItem = ({ item, index }) => {
-    const locked = isLocked(index);
-    const solved = isSolved(item);
-
-    return (
-      <View style={{ width: ITEM_WIDTH, margin: ITEM_MARGIN }}>
-        <TouchableOpacity
-          key={item.id ?? index}
-          style={[
-            globalStyles?.missionButton,
-            styles.card,
-            {
-              backgroundColor: solved ? "#22c55e" : locked ? "#6e6e6eff" : "#2563eb",
-            },
-          ]}
-          disabled={locked}
-          onPress={() =>
-            !locked &&
-            navigation.navigate("Question", {
-              mission: item,
-              categoryItems: category.items,
-              missionIndex: index,
-            })
-          }
-        >
-          <Text style={globalStyles?.missionText || styles.cardText}>{index + 1}</Text>
-          <Text style={[globalStyles?.missionText || styles.cardText, { fontSize: 13, marginTop: 6 }]}>
-            {solved ? "⭐⭐⭐" : locked ? "🔐" : ""}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
   return (
     <ImageBackground source={require("../assets/bg.png")} style={{ flex: 1 }}>
-      <SafeAreaView style={[globalStyles?.container || styles.container, { paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 8 : 20 }]}>
-        <Text style={globalStyles?.title || styles.title}>{category.category}</Text>
+      <SafeAreaView
+        style={[
+          styles.container,
+          { paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 8 : 20 },
+        ]}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.backButtonText}>← Назад</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>{category.category}</Text>
+
+          {/* Пустой view для балансировки хедера */}
+          <View style={{ width: 72 }} />
+        </View>
 
         <FlatList
           data={category.items}
-          keyExtractor={(item, idx) => String(item.id ?? idx)}
+          keyExtractor={keyExtractor}
           renderItem={renderItem}
-          numColumns={NUM_COLUMNS}
+          numColumns={numColumns}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingLeft: PADDING_LEFT, // уменьшаем левый отступ чтобы "сдвинуть влево"
-            paddingRight: PADDING_RIGHT,
-            paddingBottom: 32, // чтобы последний элемент не прятался под панелью
-            paddingTop: 8,
-            alignItems: "flex-start", // важно для корректного выравнивания при фиксированной ширине элементов
+            paddingHorizontal: PADDING_HORIZONTAL,
+            paddingBottom: 32,
+            paddingTop: 12,
+            alignItems: "flex-start",
           }}
         />
       </SafeAreaView>
@@ -135,15 +186,21 @@ export default function TicketsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 0, // горизонтальные паддинги задаются в contentContainerStyle FlatList
-    alignItems: "flex-start",
+    paddingHorizontal: 0,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: PADDING_HORIZONTAL,
+    paddingVertical: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginVertical: 14,
-    marginLeft: PADDING_LEFT,
     color: "#fff",
+    textAlign: "center",
+    flex: 1,
   },
   centerFallback: {
     flex: 1,
@@ -151,20 +208,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+  fallbackText: {
+    color: "#fff",
+    marginTop: 8,
+    fontSize: 16,
+  },
+  backButton: {
+    padding: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontWeight: "600",
+    color: "#fff",
+    fontSize: 16,
+  },
   card: {
     width: "100%",
-    paddingVertical: 18,
-    paddingHorizontal: 8,
+    aspectRatio: 1,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: "white",
-    elevation: 3,
+    borderColor: "#fff",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  cardText: {
+  cardNumber: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 18,
+    fontSize: 22,
+  },
+  cardIcon: {
+    fontSize: 24,
+    marginTop: 8,
   },
 });

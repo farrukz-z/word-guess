@@ -43,19 +43,17 @@ export default function QuestionScreen({ route, navigation }) {
   const fade = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
 
-  // звуковые ассеты
+  // Звуковые ассеты
   const winAsset = require("../assets/sounds/win.wav");
   const loseAsset = require("../assets/sounds/lose.wav");
   const hintAsset = require("../assets/sounds/click.mp3");
   const pressAsset = require("../assets/sounds/del_sim.wav");
 
-  // рефы звуков
   const winSoundRef = useRef(null);
   const loseSoundRef = useRef(null);
   const hintSoundRef = useRef(null);
   const pressSoundRef = useRef(null);
 
-  // загрузка звуков (все в одном useEffect)
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -95,7 +93,6 @@ export default function QuestionScreen({ route, navigation }) {
         }
       })();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const play = async (ref) => {
@@ -133,7 +130,6 @@ export default function QuestionScreen({ route, navigation }) {
   const [status, setStatus] = useState(null);
   const [hintUsed, setHintUsed] = useState(false);
   const [draggingLetter, setDraggingLetter] = useState(null);
-  const [winStreak, setWinStreak] = useState(0);
 
   const animateTransition = async (onMid = () => {}) => {
     await new Promise((res) => {
@@ -183,53 +179,32 @@ export default function QuestionScreen({ route, navigation }) {
 
   const handleCellPress = (slotIndex) => {
     if (status) return;
-
-    // Если буква перетаскивается и нажали на слот — вставка
     if (draggingLetter) {
       const keyIdx = draggingLetter.keyIndex;
       if (usedKeyIndexes.includes(keyIdx)) {
         handleDragEnd();
         return;
       }
+      const oldKeyIdx = guessesKeyIndex[slotIndex];
+      if (oldKeyIdx !== null) setUsedKeyIndexes((prev) => prev.filter((i) => i !== oldKeyIdx));
 
-      if (guessesLetters[slotIndex] === "") {
-        setGuessesLetters((prev) => {
-          const copy = [...prev];
-          copy[slotIndex] = draggingLetter.letter;
-          return copy;
-        });
-        setGuessesKeyIndex((prev) => {
-          const copy = [...prev];
-          copy[slotIndex] = keyIdx;
-          return copy;
-        });
-        setUsedKeyIndexes((prev) => [...prev, keyIdx]);
-      } else {
-        const oldKeyIdx = guessesKeyIndex[slotIndex];
-        if (oldKeyIdx !== null) {
-          setUsedKeyIndexes((prev) => prev.filter((i) => i !== oldKeyIdx));
-        }
-        setGuessesLetters((prev) => {
-          const copy = [...prev];
-          copy[slotIndex] = draggingLetter.letter;
-          return copy;
-        });
-        setGuessesKeyIndex((prev) => {
-          const copy = [...prev];
-          copy[slotIndex] = keyIdx;
-          return copy;
-        });
-        setUsedKeyIndexes((prev) => [...prev, keyIdx]);
-      }
+      setGuessesLetters((prev) => {
+        const copy = [...prev];
+        copy[slotIndex] = draggingLetter.letter;
+        return copy;
+      });
+      setGuessesKeyIndex((prev) => {
+        const copy = [...prev];
+        copy[slotIndex] = keyIdx;
+        return copy;
+      });
+      setUsedKeyIndexes((prev) => [...prev, keyIdx]);
       handleDragEnd();
       return;
     }
 
-    // Обычный клик - удалить букву из слота (запускаем звук удаления)
     const keyIdx = guessesKeyIndex[slotIndex];
     if (keyIdx == null) return;
-
-    // проигрываем звук удаления
     playPress().catch(() => {});
 
     setUsedKeyIndexes((prev) => prev.filter((i) => i !== keyIdx));
@@ -251,33 +226,16 @@ export default function QuestionScreen({ route, navigation }) {
     if (emptySlots.length === 0) return;
     const slot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
     const correctLetter = word[slot];
-
     const availableKeyIndex = keys.findIndex(
       (k, idx) => k.letter === correctLetter && !usedKeyIndexes.includes(idx)
     );
 
     if (availableKeyIndex === -1) {
-      setGuessesLetters((prev) => {
-        const copy = [...prev];
-        copy[slot] = correctLetter;
-        return copy;
-      });
-      setGuessesKeyIndex((prev) => {
-        const copy = [...prev];
-        copy[slot] = null;
-        return copy;
-      });
+      setGuessesLetters((prev) => { const copy = [...prev]; copy[slot] = correctLetter; return copy; });
+      setGuessesKeyIndex((prev) => { const copy = [...prev]; copy[slot] = null; return copy; });
     } else {
-      setGuessesLetters((prev) => {
-        const copy = [...prev];
-        copy[slot] = correctLetter;
-        return copy;
-      });
-      setGuessesKeyIndex((prev) => {
-        const copy = [...prev];
-        copy[slot] = availableKeyIndex;
-        return copy;
-      });
+      setGuessesLetters((prev) => { const copy = [...prev]; copy[slot] = correctLetter; return copy; });
+      setGuessesKeyIndex((prev) => { const copy = [...prev]; copy[slot] = availableKeyIndex; return copy; });
       setUsedKeyIndexes((prev) => [...prev, availableKeyIndex]);
     }
 
@@ -285,7 +243,6 @@ export default function QuestionScreen({ route, navigation }) {
     play(hintSoundRef);
   };
 
-  // Проверка ответа: при заполнении всех ячеек
   useEffect(() => {
     if (guessesLetters.every((l) => l !== "")) {
       const candidate = guessesLetters.join("");
@@ -294,34 +251,27 @@ export default function QuestionScreen({ route, navigation }) {
 
       if (correct) {
         play(winSoundRef);
-        setWinStreak((w) => w + 1);
 
         const saveAndNavigate = async () => {
           try {
             const stored = await AsyncStorage.getItem("completedWords");
             const completed = stored ? JSON.parse(stored) : [];
-            const idToSave = missionId !== undefined && missionId !== null ? String(missionId) : null;
+            const idToSave = missionId != null ? String(missionId) : null;
             if (idToSave && !completed.includes(idToSave)) {
               const newCompleted = [...completed, idToSave];
               await AsyncStorage.setItem("completedWords", JSON.stringify(newCompleted));
             }
 
             const nextMissionIndex = missionIndex + 1;
-
             setTimeout(() => {
               if (categoryItems && nextMissionIndex < categoryItems.length) {
                 const nextMission = categoryItems[nextMissionIndex];
-                navigation.replace("Question", {
-                  mission: nextMission,
-                  categoryItems,
-                  missionIndex: nextMissionIndex,
-                });
+                navigation.replace("Question", { mission: nextMission, categoryItems, missionIndex: nextMissionIndex });
               } else {
                 Alert.alert("Победа!", "Вы прошли всю категорию!", [{ text: "OK", onPress: () => navigation.goBack() }]);
               }
             }, 700);
-          } catch (error) {
-            console.error("Error saving/navigating:", error);
+          } catch {
             setTimeout(() => navigation.goBack(), 700);
           }
         };
@@ -329,42 +279,23 @@ export default function QuestionScreen({ route, navigation }) {
         if (missionId) saveAndNavigate();
         else setTimeout(() => navigation.goBack(), 700);
       } else {
-        // неверный ответ — окно "Заново" / "Назад"
         play(loseSoundRef);
-        setWinStreak(0);
-
         setTimeout(() => {
           Alert.alert(
             "Неверно",
             "Выбранный ответ неверен",
             [
-              {
-                text: "Заново",
-                onPress: () => {
-                  handleRetry();
-                },
-              },
-              {
-                text: "Назад",
-                onPress: () => {
-                  navigation.goBack();
-                },
-                style: "cancel",
-              },
+              { text: "Заново", onPress: () => handleRetry() },
+              { text: "Назад", onPress: () => navigation.goBack(), style: "cancel" },
             ],
             { cancelable: false }
           );
-
-          // Сброс для новой попытки
-          setGuessesLetters(Array(word.length).fill(""));
-          setGuessesKeyIndex(Array(word.length).fill(null));
-          setUsedKeyIndexes([]);
-          setStatus(null);
+          resetRound();
         }, 200);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guessesLetters, word, navigation, missionId, missionIndex, categoryItems]);
+  }, [guessesLetters]);
 
   const resetRound = () => {
     setGuessesLetters(Array(word.length).fill(""));
@@ -375,39 +306,31 @@ export default function QuestionScreen({ route, navigation }) {
     setDraggingLetter(null);
   };
 
-  const handleRetry = () => {
-    animateTransition(() => {
-      resetRound();
-    });
-  };
+  const handleRetry = () => animateTransition(resetRound);
 
   return (
     <Animated.View style={{ flex: 1, opacity: fade, transform: [{ translateY }] }}>
       <ImageBackground source={require("../assets/bg.png")} style={{ flex: 1 }}>
         <View style={[styles.container, { paddingTop: 32 }]}>
           <View style={{ width: "100%", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <View style={{ width: "100%", justifyContent: "space-between", flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginLeft: 10 }}>
-                <View style={{ padding: 8, backgroundColor: "#e2e8f0", borderRadius: 8 }}>
-                  <Text style={{ fontWeight: "600" }}>← Back</Text>
-                </View>
-              </TouchableOpacity>
-
-              <Text style={[styles.title, { marginTop: 16, color: "#fff" }]}>
-                Mission: {mission?.id || "?"}
-              </Text>
-
-              <TouchableOpacity onPress={handleHint} disabled={!!(hintUsed || status)}>
-                <View style={{ padding: 8, backgroundColor: hintUsed ? "#64748b" : "#f59e0b", borderRadius: 8 }}>
-                  <Text style={{ color: hintUsed ? "#cbd5e1" : "#000", fontWeight: "600" }}>
-                    {hintUsed ? "💡 Used" : "💡 Hint"}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginLeft: 10 }}>
+              <View style={{ padding: 8, backgroundColor: "#e2e8f0", borderRadius: 8 }}>
+                <Text style={{ fontWeight: "600" }}>← Back</Text>
+              </View>
+            </TouchableOpacity>
+            <Text style={[styles.title, { marginTop: 16, color: "#fff" }]}>Mission: {mission?.id || "?"}</Text>
+            <TouchableOpacity onPress={handleHint} disabled={!!(hintUsed || status)}>
+              <View style={{ padding: 8, backgroundColor: hintUsed ? "#64748b" : "#f59e0b", borderRadius: 8 }}>
+                <Text style={{ color: hintUsed ? "#cbd5e1" : "#000", fontWeight: "600" }}>
+                  {hintUsed ? "💡 Used" : "💡 Hint"}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
-          <Image source={mission?.image} style={[styles.missionImage, { width: 220, height: 140 }]} resizeMode="contain" />
+          {mission?.image && (
+            <Image source={mission.image} style={[styles.missionImage, { width: 220, height: 140 }]} resizeMode="contain" />
+          )}
 
           <View style={{ width: "90%", height: 8, backgroundColor: "#334155", borderRadius: 6, overflow: "hidden", marginTop: 12 }}>
             <View
@@ -441,10 +364,7 @@ export default function QuestionScreen({ route, navigation }) {
           />
 
           <View style={{ alignItems: "center", marginTop: 8 }}>
-            <TouchableOpacity
-              onPress={handleRetry}
-              style={{ backgroundColor: "#3b82f6", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
-            >
+            <TouchableOpacity onPress={handleRetry} style={{ backgroundColor: "#3b82f6", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}>
               <Text style={{ color: "#fff", fontWeight: "700" }}>Reset</Text>
             </TouchableOpacity>
           </View>
